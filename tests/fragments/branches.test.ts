@@ -44,6 +44,8 @@ function makeStory(id: string = TEST_STORY_ID): StoryMeta {
       modelOverrides: {},
       generationMode: 'standard' as const,
       autoApplyLibrarianSuggestions: false,
+      disableLibrarianDirections: false,
+      disableLibrarianSuggestions: false,
       contextOrderMode: 'simple',
       fragmentOrder: [],
       contextCompact: { type: 'proseLimit', value: 10 },

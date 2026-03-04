@@ -18,6 +18,8 @@ export function makeTestSettings(overrides?: Partial<StorySettings>): StorySetti
     modelOverrides: {},
     generationMode: 'standard' as const,
     autoApplyLibrarianSuggestions: false,
+    disableLibrarianDirections: false,
+    disableLibrarianSuggestions: false,
     contextOrderMode: 'simple',
     fragmentOrder: [],
     contextCompact: { type: 'proseLimit', value: 10 },

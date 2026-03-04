@@ -739,6 +739,22 @@ export function SettingsPanel({
               label="Toggle auto-apply suggestions"
             />
           </SettingRow>
+          <SettingRow label="Disable directions" description="Skip story direction suggestions during analysis">
+            <ToggleSwitch
+              on={story.settings.disableLibrarianDirections ?? false}
+              onToggle={() => updateMutation.mutate({ disableLibrarianDirections: !(story.settings.disableLibrarianDirections ?? false) })}
+              disabled={updateMutation.isPending}
+              label="Toggle disable directions"
+            />
+          </SettingRow>
+          <SettingRow label="Disable suggestions" description="Skip fragment create/update suggestions during analysis">
+            <ToggleSwitch
+              on={story.settings.disableLibrarianSuggestions ?? false}
+              onToggle={() => updateMutation.mutate({ disableLibrarianSuggestions: !(story.settings.disableLibrarianSuggestions ?? false) })}
+              disabled={updateMutation.isPending}
+              label="Toggle disable suggestions"
+            />
+          </SettingRow>
           <SettingRow label="Max steps" description="Tool-use rounds per generation" helpTopic="generation#max-steps">
             <NumberStepper
               value={story.settings.maxSteps ?? 10}

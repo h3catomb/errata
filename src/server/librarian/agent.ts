@@ -18,6 +18,7 @@ import { createLogger } from '../logging'
 import { createToolAgent } from '../agents/create-agent'
 import { compileAgentContext } from '../agents/compile-agent-context'
 import { createEmptyCollector, createAnalysisTools } from './analysis-tools'
+import { buildAnalyzeSystemPrompt } from './blocks'
 import {
   createAnalysisBuffer,
   pushEvent,
@@ -233,8 +234,10 @@ async function runLibrarianInner(
   }
 
   // Create collector and analysis tools
+  const disableDirections = story.settings?.disableLibrarianDirections === true
+  const disableSuggestions = story.settings?.disableLibrarianSuggestions === true
   const collector = createEmptyCollector()
-  const analysisTools = createAnalysisTools(collector, { dataDir, storyId })
+  const analysisTools = createAnalysisTools(collector, { dataDir, storyId, disableDirections, disableSuggestions })
 
   // Compile context via block system
   const compiled = await compileAgentContext(dataDir, storyId, 'librarian.analyze', blockContext, analysisTools)
@@ -253,6 +256,11 @@ async function runLibrarianInner(
   // Extract system instructions from compiled messages
   const systemMessage = compiled.messages.find(m => m.role === 'system')
   const userMessage = compiled.messages.find(m => m.role === 'user')
+
+  // Override system prompt when directions or suggestions are disabled
+  if ((disableDirections || disableSuggestions) && systemMessage) {
+    systemMessage.content = buildAnalyzeSystemPrompt({ disableDirections, disableSuggestions }).trim()
+  }
 
   const agent = createToolAgent({
     model,
@@ -386,7 +394,7 @@ async function runLibrarianInner(
     trace: buffer.events as LibrarianAnalysis['trace'],
   }
 
-  const autoApplySuggestions = story.settings?.autoApplyLibrarianSuggestions === true
+  const autoApplySuggestions = story.settings?.autoApplyLibrarianSuggestions === true && !disableSuggestions
   if (autoApplySuggestions && analysis.fragmentSuggestions.length > 0) {
     requestLogger.info('Auto-applying librarian suggestions', {
       suggestionCount: analysis.fragmentSuggestions.length,

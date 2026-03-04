@@ -100,8 +100,9 @@ export const updateSummaryInputSchema = z.object({
 
 // --- Tools ---
 
-export function createAnalysisTools(collector: AnalysisCollector, opts?: { dataDir: string; storyId: string }) {
-  return {
+export function createAnalysisTools(collector: AnalysisCollector, opts?: { dataDir: string; storyId: string; disableDirections?: boolean; disableSuggestions?: boolean }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const tools: Record<string, any> = {
     updateSummary: tool({
       description: 'Set or update the summary for this prose fragment. Describes what happened in the new prose. Last call wins.',
       inputSchema: updateSummaryInputSchema,
@@ -155,7 +156,49 @@ export function createAnalysisTools(collector: AnalysisCollector, opts?: { dataD
       },
     }),
 
-    suggestFragment: tool({
+    reportTimeline: tool({
+      description: 'Report significant timeline events from the new prose.',
+      inputSchema: z.object({
+        events: z.array(z.object({
+          event: z.string().describe('Description of the event'),
+          position: z.union([z.literal('before'), z.literal('during'), z.literal('after')]).describe('"before" for flashback, "during" for concurrent, "after" for sequential'),
+        })),
+      }),
+      execute: async ({ events }) => {
+        collector.timelineEvents.push(...events)
+        return { ok: true }
+      },
+    }),
+
+    updateFragment: tool({
+      description: 'Directly update an existing fragment by ID. Use this to correct or enrich character, knowledge, or guideline fragments based on new information from the prose.',
+      inputSchema: z.object({
+        fragmentId: z.string().describe('The ID of the fragment to update (e.g. ch-abc, kn-xyz)'),
+        name: z.string().optional().describe('New name for the fragment'),
+        description: z.string().max(250).optional().describe('New description (max 250 chars)'),
+        content: z.string().optional().describe('New content. Retain important established facts.'),
+      }),
+      execute: async ({ fragmentId, name, description, content }) => {
+        if (!opts) return { error: 'updateFragment not available in this context' }
+        const existing = await getFragment(opts.dataDir, opts.storyId, fragmentId)
+        if (!existing) return { error: `Fragment ${fragmentId} not found` }
+        if (existing.type === 'prose') return { error: 'Cannot update prose fragments via this tool' }
+        const protection = checkFragmentWrite(existing, { content })
+        if (!protection.allowed) return { error: protection.reason }
+        const updates: Record<string, string> = {}
+        if (name !== undefined) updates.name = name
+        if (description !== undefined) updates.description = description
+        if (content !== undefined) updates.content = content
+        if (Object.keys(updates).length === 0) return { error: 'No fields to update' }
+        const updated = await updateFragmentVersioned(opts.dataDir, opts.storyId, fragmentId, updates, { reason: 'librarian-analysis' })
+        if (!updated) return { error: `Failed to update fragment ${fragmentId}` }
+        return { ok: true, fragmentId: updated.id }
+      },
+    }),
+  }
+
+  if (!opts?.disableSuggestions) {
+    tools.suggestFragment = tool({
       description: 'Suggest creating or updating character/knowledge fragments based on new information in the prose. Each character or knowledge entry should appear only once. If updating an existing fragment, respect locked/frozen protections — locked fragments cannot be modified, and frozen sections must be preserved verbatim in the new content.',
       inputSchema: z.object({
         suggestions: z.array(z.object({
@@ -200,49 +243,11 @@ export function createAnalysisTools(collector: AnalysisCollector, opts?: { dataD
         }
         return { ok: true }
       },
-    }),
+    })
+  }
 
-    reportTimeline: tool({
-      description: 'Report significant timeline events from the new prose.',
-      inputSchema: z.object({
-        events: z.array(z.object({
-          event: z.string().describe('Description of the event'),
-          position: z.union([z.literal('before'), z.literal('during'), z.literal('after')]).describe('"before" for flashback, "during" for concurrent, "after" for sequential'),
-        })),
-      }),
-      execute: async ({ events }) => {
-        collector.timelineEvents.push(...events)
-        return { ok: true }
-      },
-    }),
-
-    updateFragment: tool({
-      description: 'Directly update an existing fragment by ID. Use this to correct or enrich character, knowledge, or guideline fragments based on new information from the prose.',
-      inputSchema: z.object({
-        fragmentId: z.string().describe('The ID of the fragment to update (e.g. ch-abc, kn-xyz)'),
-        name: z.string().optional().describe('New name for the fragment'),
-        description: z.string().max(250).optional().describe('New description (max 250 chars)'),
-        content: z.string().optional().describe('New content. Retain important established facts.'),
-      }),
-      execute: async ({ fragmentId, name, description, content }) => {
-        if (!opts) return { error: 'updateFragment not available in this context' }
-        const existing = await getFragment(opts.dataDir, opts.storyId, fragmentId)
-        if (!existing) return { error: `Fragment ${fragmentId} not found` }
-        if (existing.type === 'prose') return { error: 'Cannot update prose fragments via this tool' }
-        const protection = checkFragmentWrite(existing, { content })
-        if (!protection.allowed) return { error: protection.reason }
-        const updates: Record<string, string> = {}
-        if (name !== undefined) updates.name = name
-        if (description !== undefined) updates.description = description
-        if (content !== undefined) updates.content = content
-        if (Object.keys(updates).length === 0) return { error: 'No fields to update' }
-        const updated = await updateFragmentVersioned(opts.dataDir, opts.storyId, fragmentId, updates, { reason: 'librarian-analysis' })
-        if (!updated) return { error: `Failed to update fragment ${fragmentId}` }
-        return { ok: true, fragmentId: updated.id }
-      },
-    }),
-
-    suggestDirections: tool({
+  if (!opts?.disableDirections) {
+    tools.suggestDirections = tool({
       description: 'Suggest 3-5 possible directions the story could go next.',
       inputSchema: z.object({
         directions: z.array(z.object({
@@ -255,6 +260,8 @@ export function createAnalysisTools(collector: AnalysisCollector, opts?: { dataD
         collector.directions = directions
         return { ok: true }
       },
-    }),
+    })
   }
+
+  return tools
 }

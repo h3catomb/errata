@@ -111,6 +111,33 @@ export function librarianRoutes(dataDir: string) {
       }
     }, { detail: { summary: 'Accept a fragment suggestion' } })
 
+    .post('/stories/:storyId/librarian/analyses/:analysisId/suggestions/:index/dismiss', async ({ params, set }) => {
+      const analysis = await getLibrarianAnalysis(dataDir, params.storyId, params.analysisId)
+      if (!analysis) {
+        set.status = 404
+        return { error: 'Analysis not found' }
+      }
+      const index = parseInt(params.index, 10)
+      if (isNaN(index) || index < 0 || index >= analysis.fragmentSuggestions.length) {
+        set.status = 422
+        return { error: 'Invalid suggestion index' }
+      }
+
+      analysis.fragmentSuggestions[index].dismissed = true
+      await saveLibrarianAnalysis(dataDir, params.storyId, analysis)
+      return { analysis }
+    }, { detail: { summary: 'Dismiss a fragment suggestion' } })
+
+    .delete('/stories/:storyId/librarian/analyses/:analysisId', async ({ params, set }) => {
+      const { deleteAnalysis } = await import('../librarian/storage')
+      const deleted = await deleteAnalysis(dataDir, params.storyId, params.analysisId)
+      if (!deleted) {
+        set.status = 404
+        return { error: 'Analysis not found' }
+      }
+      return { ok: true }
+    }, { detail: { summary: 'Delete an analysis' } })
+
     // --- Librarian Refine ---
     .post('/stories/:storyId/librarian/refine', async ({ params, body, set }) => {
       const requestLogger = logger.child({ storyId: params.storyId })

@@ -20,6 +20,10 @@ export const librarian = {
     apiFetch<LibrarianAnalysis>(`/stories/${storyId}/librarian/analyses/${id}`),
   acceptSuggestion: (storyId: string, analysisId: string, index: number) =>
     apiFetch<LibrarianAcceptSuggestionResponse>(`/stories/${storyId}/librarian/analyses/${analysisId}/suggestions/${index}/accept`, { method: 'POST' }),
+  dismissSuggestion: (storyId: string, analysisId: string, index: number) =>
+    apiFetch<{ analysis: LibrarianAnalysis }>(`/stories/${storyId}/librarian/analyses/${analysisId}/suggestions/${index}/dismiss`, { method: 'POST' }),
+  deleteAnalysis: (storyId: string, analysisId: string) =>
+    apiFetch<{ ok: boolean }>(`/stories/${storyId}/librarian/analyses/${analysisId}`, { method: 'DELETE' }),
   refine: (storyId: string, fragmentId: string, instructions?: string) =>
     fetchEventStream(`/stories/${storyId}/librarian/refine`, { fragmentId, instructions }),
   transformProseSelection: (

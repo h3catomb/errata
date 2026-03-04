@@ -27,6 +27,7 @@ import {
   BookOpen,
   Trash2,
   ArrowLeft,
+  X,
 } from 'lucide-react'
 import { RefinementPanel } from '@/components/refinement/RefinementPanel'
 import { LibrarianChat } from '@/components/librarian/LibrarianChat'
@@ -290,6 +291,7 @@ function formatRelativeTime(date: Date): string {
 function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { status: LibrarianState | undefined; onOpenChat?: (message: string) => void }) {
   const [refineTarget, setRefineTarget] = useState<{ fragmentId: string; fragmentName: string; instructions?: string } | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [showAllAnalyses, setShowAllAnalyses] = useState(false)
 
   const { data: characters } = useQuery({
     queryKey: ['fragments', storyId, 'character'],
@@ -363,7 +365,7 @@ function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { s
             {!hasFindings && <SectionLabel>Analyses</SectionLabel>}
             {hasFindings && <div className="h-2" />}
             <div className="space-y-1.5">
-              {analyses.slice(0, 6).map((summary) => (
+              {(showAllAnalyses ? analyses : analyses.slice(0, 6)).map((summary) => (
                 <AnalysisItem
                   key={summary.id}
                   storyId={storyId}
@@ -375,6 +377,14 @@ function StoryContent({ storyId, status, onOpenChat }: LibrarianPanelProps & { s
                   charName={charName}
                 />
               ))}
+              {!showAllAnalyses && analyses.length > 6 && (
+                <button
+                  onClick={() => setShowAllAnalyses(true)}
+                  className="w-full text-center text-[0.625rem] text-muted-foreground hover:text-foreground py-1.5 transition-colors"
+                >
+                  Show {analyses.length - 6} more
+                </button>
+              )}
             </div>
           </section>
         )}
@@ -514,12 +524,27 @@ function AnalysisItem({
     },
   })
 
+  const dismissMutation = useMutation({
+    mutationFn: (index: number) =>
+      api.librarian.dismissSuggestion(storyId, summary.id, index),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['librarian-analyses', storyId] })
+      queryClient.invalidateQueries({ queryKey: ['librarian-analysis', storyId, summary.id] })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => api.librarian.deleteAnalysis(storyId, summary.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['librarian-analyses', storyId] })
+    },
+  })
+
   const handleAcceptSuggestion = (_suggestion: LibrarianAnalysis['fragmentSuggestions'][number], index: number) => {
     acceptMutation.mutate(index)
   }
 
   const pendingSuggestions = summary.pendingSuggestionCount
-  const hasBadges = summary.contradictionCount > 0 || pendingSuggestions > 0
 
   return (
     <div className="rounded-md border border-border/25 overflow-hidden">
@@ -533,20 +558,27 @@ function AnalysisItem({
         }
         <span className="font-mono text-foreground/60 truncate">{summary.fragmentId}</span>
         <span className="text-muted-foreground shrink-0">{timeStr}</span>
-        {hasBadges && (
-          <div className="ml-auto flex gap-1 shrink-0">
-            {summary.contradictionCount > 0 && (
-              <span className="inline-flex items-center justify-center size-4 rounded-full bg-destructive/15 text-destructive text-[0.5625rem] font-mono">
-                {summary.contradictionCount}
-              </span>
-            )}
-            {pendingSuggestions > 0 && (
-              <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary/10 text-primary text-[0.5625rem] font-mono">
-                {pendingSuggestions}
-              </span>
-            )}
-          </div>
-        )}
+        <div className="ml-auto flex gap-1 shrink-0 items-center">
+          {summary.contradictionCount > 0 && (
+            <span className="inline-flex items-center justify-center size-4 rounded-full bg-destructive/15 text-destructive text-[0.5625rem] font-mono">
+              {summary.contradictionCount}
+            </span>
+          )}
+          {pendingSuggestions > 0 && (
+            <span className="inline-flex items-center justify-center size-4 rounded-full bg-primary/10 text-primary text-[0.5625rem] font-mono">
+              {pendingSuggestions}
+            </span>
+          )}
+          <button
+            className="size-5 inline-flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors rounded"
+            onClick={(e) => {
+              e.stopPropagation()
+              deleteMutation.mutate()
+            }}
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
       </button>
 
       {expanded && analysis && (
@@ -698,18 +730,33 @@ function AnalysisItem({
                       </p>
                     )}
                   </div>
-                  {!s.accepted && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-5 shrink-0 text-muted-foreground hover:text-foreground"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleAcceptSuggestion(s, i)
-                      }}
-                    >
-                      <Plus className="size-3" />
-                    </Button>
+                  {s.dismissed ? (
+                    <span className="text-[0.5625rem] text-muted-foreground italic shrink-0">dismissed</span>
+                  ) : !s.accepted && (
+                    <div className="flex gap-0.5 shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-5 text-muted-foreground hover:text-foreground"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleAcceptSuggestion(s, i)
+                        }}
+                      >
+                        <Plus className="size-3" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="size-5 text-muted-foreground hover:text-destructive"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          dismissMutation.mutate(i)
+                        }}
+                      >
+                        <X className="size-3" />
+                      </Button>
+                    </div>
                   )}
                 </div>
               ))}

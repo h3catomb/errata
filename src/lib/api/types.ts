@@ -19,6 +19,8 @@ export interface StoryMeta {
     modelId?: string | null
     generationMode?: 'standard' | 'prewriter'
     autoApplyLibrarianSuggestions?: boolean
+    disableLibrarianDirections?: boolean
+    disableLibrarianSuggestions?: boolean
     contextOrderMode?: 'simple' | 'advanced'
     fragmentOrder?: string[]
     contextCompact?: { type: 'proseLimit' | 'maxTokens' | 'maxCharacters'; value: number }
@@ -134,6 +136,7 @@ export interface LibrarianAnalysis {
     accepted?: boolean
     autoApplied?: boolean
     createdFragmentId?: string
+    dismissed?: boolean
   }>
   timelineEvents: Array<{
     event: string

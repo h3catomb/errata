@@ -33,6 +33,7 @@ export interface LibrarianAnalysis {
     accepted?: boolean
     autoApplied?: boolean
     createdFragmentId?: string
+    dismissed?: boolean
   }>
   /** @deprecated Use fragmentSuggestions. Kept for backward compat with stored JSON. */
   knowledgeSuggestions?: Array<{
@@ -269,6 +270,34 @@ function normalizeAnalysis(data: Record<string, unknown>): LibrarianAnalysis {
   return analysis
 }
 
+export async function deleteAnalysis(
+  dataDir: string,
+  storyId: string,
+  analysisId: string,
+): Promise<boolean> {
+  const path = await analysisPath(dataDir, storyId, analysisId)
+  if (!existsSync(path)) return false
+
+  // Read the analysis to get fragmentId for index cleanup
+  const raw = await readFile(path, 'utf-8')
+  const analysis = normalizeAnalysis(JSON.parse(raw))
+
+  await unlink(path)
+
+  // Clean up index entry if it points to this analysis
+  const index = await getAnalysisIndex(dataDir, storyId)
+  if (index) {
+    const entry = index.latestByFragmentId[analysis.fragmentId]
+    if (entry && entry.analysisId === analysisId) {
+      delete index.latestByFragmentId[analysis.fragmentId]
+      index.updatedAt = new Date().toISOString()
+      await saveAnalysisIndex(dataDir, storyId, index)
+    }
+  }
+
+  return true
+}
+
 export async function listAnalyses(
   dataDir: string,
   storyId: string,
@@ -289,7 +318,7 @@ export async function listAnalyses(
       fragmentId: analysis.fragmentId,
       contradictionCount: analysis.contradictions.length,
       suggestionCount: analysis.fragmentSuggestions.length,
-      pendingSuggestionCount: analysis.fragmentSuggestions.filter((s) => !s.accepted).length,
+      pendingSuggestionCount: analysis.fragmentSuggestions.filter((s) => !s.accepted && !s.dismissed).length,
       timelineEventCount: analysis.timelineEvents.length,
       directionsCount: analysis.directions?.length ?? 0,
       hasTrace: !!analysis.trace?.length,

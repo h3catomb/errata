@@ -20,30 +20,63 @@ import {
 
 // ─── Librarian Analyze ───
 
-export const ANALYZE_SYSTEM_PROMPT = `
+export function buildAnalyzeSystemPrompt(opts?: { disableDirections?: boolean; disableSuggestions?: boolean }): string {
+  const toolLines: string[] = [
+    '1. updateSummary — Provide a concise summary of what happened in the new prose.',
+    '   - Also provide structured fields when possible: events[], stateChanges[], openThreads[].',
+    '   - If summary text is blank, structured fields are required.',
+    '2. reportMentions — Report each character reference by name, nickname, or title (not pronouns). Include the character ID and the exact text used.',
+    '3. reportContradictions — Flag when the new prose contradicts established facts in the summary, character descriptions, or knowledge. Only flag clear contradictions, not ambiguities.',
+  ]
+
+  let toolNumber = 4
+
+  if (!opts?.disableSuggestions) {
+    toolLines.push(
+      `${toolNumber}. suggestFragment — Suggest creating new character/knowledge fragments based on new information.`,
+      '   - Only use this for truly new fragments that don\'t exist yet. Omit targetFragmentId.',
+      '   - Set type to "character" for characters or "knowledge" for world-building details, locations, items, or facts.',
+    )
+    toolNumber++
+  }
+
+  toolLines.push(
+    `${toolNumber}. updateFragment — Directly update an existing fragment by ID. Use this when an existing character, knowledge, or guideline fragment needs correction or enrichment based on new information.`,
+    '   - Provide the fragmentId and one or more of: name, description, content.',
+    '   - Retain important established facts when updating content.',
+  )
+  toolNumber++
+
+  toolLines.push(
+    `${toolNumber}. reportTimeline — Note significant events. "position" is relative to the previous prose: "before" for flashback, "during" for concurrent, "after" for sequential.`,
+  )
+  toolNumber++
+
+  if (!opts?.disableDirections) {
+    toolLines.push(
+      `${toolNumber}. suggestDirections — Suggest 3-5 possible directions the story could go next. Each direction needs a short title, a description of what would happen, and an instruction the writer could follow. Offer a mix: continue the current scene, introduce a twist, explore a character's inner thoughts, shift to a new setting, etc.`,
+    )
+  }
+
+  const alwaysCall = opts?.disableDirections
+    ? 'Always call updateSummary.'
+    : 'Always call updateSummary and suggestDirections.'
+
+  return `
 You are a librarian agent for a collaborative writing app.
 Your job is to analyze new prose fragments and maintain story continuity.
 
-You have seven reporting tools. Use them to report your findings:
+You have ${toolNumber - (opts?.disableDirections ? 1 : 0)} reporting tools. Use them to report your findings:
 
-1. updateSummary — Provide a concise summary of what happened in the new prose.
-   - Also provide structured fields when possible: events[], stateChanges[], openThreads[].
-   - If summary text is blank, structured fields are required.
-2. reportMentions — Report each character reference by name, nickname, or title (not pronouns). Include the character ID and the exact text used.
-3. reportContradictions — Flag when the new prose contradicts established facts in the summary, character descriptions, or knowledge. Only flag clear contradictions, not ambiguities.
-4. suggestFragment — Suggest creating new character/knowledge fragments based on new information.
-   - Only use this for truly new fragments that don't exist yet. Omit targetFragmentId.
-   - Set type to "character" for characters or "knowledge" for world-building details, locations, items, or facts.
-5. updateFragment — Directly update an existing fragment by ID. Use this when an existing character, knowledge, or guideline fragment needs correction or enrichment based on new information.
-   - Provide the fragmentId and one or more of: name, description, content.
-   - Retain important established facts when updating content.
-6. reportTimeline — Note significant events. "position" is relative to the previous prose: "before" for flashback, "during" for concurrent, "after" for sequential.
-7. suggestDirections — Suggest 3-5 possible directions the story could go next. Each direction needs a short title, a description of what would happen, and an instruction the writer could follow. Offer a mix: continue the current scene, introduce a twist, explore a character's inner thoughts, shift to a new setting, etc.
+${toolLines.join('\n')}
 
-Always call updateSummary and suggestDirections. Only call the other tools if there are relevant findings.
+${alwaysCall} Only call the other tools if there are relevant findings.
 If there are no contradictions, suggestions, mentions, or timeline events, don't call those tools.
 Only return 'Analysis complete' in your final output.
 `
+}
+
+export const ANALYZE_SYSTEM_PROMPT = buildAnalyzeSystemPrompt()
 
 export function createLibrarianAnalyzeBlocks(ctx: AgentBlockContext): ContextBlock[] {
   const blocks: ContextBlock[] = []
