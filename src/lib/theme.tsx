@@ -488,6 +488,83 @@ export function useCustomCss(): [string, boolean, (css: string) => void, (enable
   return [css, enabled, setCss, setEnabled]
 }
 
+// --- Prose color preferences ---
+
+export interface ProseColorConfig {
+  dialogue?: string
+  narration?: string
+  emphasis?: string
+}
+
+const PROSE_COLORS_KEY = 'errata-prose-colors'
+const PROSE_COLORS_EVENT = 'errata-prose-colors-change'
+
+const PROSE_COLOR_CSS_VARS: Record<keyof ProseColorConfig, string> = {
+  dialogue: '--prose-dialogue',
+  narration: '--prose-narration',
+  emphasis: '--prose-emphasis',
+}
+
+function applyProseColors(colors: ProseColorConfig) {
+  if (typeof document === 'undefined') return
+  const style = document.documentElement.style
+  for (const [key, cssVar] of Object.entries(PROSE_COLOR_CSS_VARS) as [keyof ProseColorConfig, string][]) {
+    const value = colors[key]
+    if (value) {
+      style.setProperty(cssVar, value)
+    } else {
+      style.removeProperty(cssVar)
+    }
+  }
+}
+
+function getInitialProseColors(): ProseColorConfig {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = localStorage.getItem(PROSE_COLORS_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+// Apply saved prose colors eagerly on module load (prevents FOUC)
+if (typeof window !== 'undefined') {
+  const _storedColors = getInitialProseColors()
+  if (Object.keys(_storedColors).length > 0) {
+    applyProseColors(_storedColors)
+  }
+}
+
+export function useProseColors(): [ProseColorConfig, (colors: ProseColorConfig) => void, () => void] {
+  const [colors, setColorsState] = useState<ProseColorConfig>(getInitialProseColors)
+
+  useEffect(() => {
+    applyProseColors(colors)
+  }, [colors])
+
+  useEffect(() => {
+    const handler = (e: Event) => setColorsState((e as CustomEvent<ProseColorConfig>).detail)
+    window.addEventListener(PROSE_COLORS_EVENT, handler)
+    return () => window.removeEventListener(PROSE_COLORS_EVENT, handler)
+  }, [])
+
+  const setColors = useCallback((next: ProseColorConfig) => {
+    setColorsState(next)
+    localStorage.setItem(PROSE_COLORS_KEY, JSON.stringify(next))
+    window.dispatchEvent(new CustomEvent(PROSE_COLORS_EVENT, { detail: next }))
+  }, [])
+
+  const resetColors = useCallback(() => {
+    setColorsState({})
+    localStorage.removeItem(PROSE_COLORS_KEY)
+    applyProseColors({})
+    window.dispatchEvent(new CustomEvent(PROSE_COLORS_EVENT, { detail: {} }))
+  }, [])
+
+  return [colors, setColors, resetColors]
+}
+
 // --- Writing transforms preference ---
 
 export interface WritingTransform {

@@ -450,10 +450,18 @@ code {
   -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
 }
 
-/* ── Prose dialogue ──────────────────────────────────── */
+/* ── Prose color overrides ───────────────────────────── */
+
+.prose-content {
+  color: var(--prose-narration, inherit);
+}
 
 .prose-dialogue {
   color: var(--prose-dialogue, oklch(0.65 0.05 250));
+}
+
+.prose-content em:not(.prose-dialogue) {
+  color: var(--prose-emphasis, inherit);
 }
 
 /* ── Character mention highlights ────────────────────── */

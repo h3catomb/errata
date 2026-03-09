@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type StoryMeta, type GlobalConfigSafe } from '@/lib/api'
-import { useTheme, useQuickSwitch, useCharacterMentions, useTimelineBar, useProseWidth, useUiFontSize, UI_FONT_SIZE_LABELS, useProseFontSize, PROSE_FONT_SIZE_LABELS, useFontPreferences, getActiveFont, FONT_CATALOGUE, loadFullFontCatalogue, useCustomCss, useWritingTransforms, type FontRole, type ProseWidth, type UiFontSize, type ProseFontSize } from '@/lib/theme'
-import { Settings2, ChevronRight, ExternalLink, Eye, EyeOff, Puzzle, RotateCcw, CircleHelp, Code, Wand2, Compass, ArrowLeft } from 'lucide-react'
+import { useTheme, useQuickSwitch, useCharacterMentions, useTimelineBar, useProseWidth, useUiFontSize, UI_FONT_SIZE_LABELS, useProseFontSize, PROSE_FONT_SIZE_LABELS, useFontPreferences, getActiveFont, FONT_CATALOGUE, loadFullFontCatalogue, useCustomCss, useProseColors, useWritingTransforms, type FontRole, type ProseWidth, type UiFontSize, type ProseFontSize } from '@/lib/theme'
+import { Settings2, ChevronRight, ExternalLink, Eye, EyeOff, Puzzle, RotateCcw, CircleHelp, Code, Wand2, Compass, ArrowLeft, Palette } from 'lucide-react'
 import { useHelp } from '@/hooks/use-help'
 import { CustomCssPanel } from '@/components/settings/CustomCssPanel'
+import { ProseColorsPanel } from '@/components/settings/ProseColorsPanel'
 import { CustomTransformsPanel } from '@/components/settings/CustomTransformsPanel'
 import { ModelSelect } from '@/components/settings/ModelSelect'
 import { ProviderSelect } from '@/components/settings/ProviderSelect'
@@ -386,6 +387,7 @@ export function SettingsPanel({
   }
 
   const [customCssPanelOpen, setCustomCssPanelOpen] = useState(false)
+  const [proseColorsPanelOpen, setProseColorsPanelOpen] = useState(false)
   const [transformsPanelOpen, setTransformsPanelOpen] = useState(false)
   const [guidedPromptsPanelOpen, setGuidedPromptsPanelOpen] = useState(false)
   const [writingTransforms] = useWritingTransforms()
@@ -401,8 +403,14 @@ export function SettingsPanel({
   const [fontPrefs, setFont, resetFonts] = useFontPreferences()
   const hasCustomFonts = Object.keys(fontPrefs).length > 0
   const [, customCssEnabled, , setCustomCssEnabled] = useCustomCss()
+  const [proseColors] = useProseColors()
+  const hasProseColors = Object.values(proseColors).some(Boolean)
 
   const summaryCompact = story.settings.summaryCompact ?? { maxCharacters: 12000, targetCharacters: 9000 }
+
+  if (proseColorsPanelOpen) {
+    return <ProseColorsPanel onClose={() => setProseColorsPanelOpen(false)} />
+  }
 
   if (customCssPanelOpen) {
     return <CustomCssPanel onClose={() => setCustomCssPanelOpen(false)} />
@@ -487,6 +495,22 @@ export function SettingsPanel({
               onChange={setProseFontSize}
             />
           </SettingRow>
+          <button
+            type="button"
+            onClick={() => setProseColorsPanelOpen(true)}
+            className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-accent/20 transition-colors"
+          >
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <Palette className="size-3 text-muted-foreground" />
+                <p className="text-[0.75rem] font-medium text-foreground/80">Prose colors</p>
+              </div>
+              <p className="text-[0.625rem] text-muted-foreground mt-0.5 leading-snug">
+                {hasProseColors ? 'Custom colors active' : 'Customize dialogue, narration & emphasis colors'}
+              </p>
+            </div>
+            <ChevronRight className="size-3.5 text-muted-foreground shrink-0" />
+          </button>
           <SettingRow label="Custom CSS" description="Apply your own styles globally">
             <ToggleSwitch on={customCssEnabled} onToggle={() => setCustomCssEnabled(!customCssEnabled)} label="Toggle custom CSS" />
           </SettingRow>
