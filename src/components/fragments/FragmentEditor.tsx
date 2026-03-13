@@ -126,8 +126,8 @@ export function FragmentEditor({
     }
   }, [sourceFragment, createType, prefill, fragmentProp?.id])
 
-  const invalidate = async () => {
-    const fType = fragment?.type
+  const invalidate = async (overrideType?: string) => {
+    const fType = overrideType ?? fragment?.type
     const promises: Promise<void>[] = [
       queryClient.invalidateQueries({ queryKey: ['fragments-archived', storyId] }),
     ]
@@ -153,7 +153,7 @@ export function FragmentEditor({
     mutationFn: (data: { type: string; name: string; description: string; content: string }) =>
       api.fragments.create(storyId, data),
     onSuccess: (created) => {
-      invalidate()
+      invalidate(created.type)
       onSaved(created)
     },
   })
